@@ -2,7 +2,15 @@ import pyspark.sql.functions as f
 from dotenv import load_dotenv
 import os
 from pyspark.sql import SparkSession
+import logging
 
+#Initializing Logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch = logging.StreamHandler()
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 # Create a Spark session
 spark = SparkSession.builder.appName("CleaningData")\
     .config('spark.driver.extraClassPath','/usr/lib/jvm/java-17-openjdk-amd64/lib/postgresql-42.6.0.jar')\
@@ -15,7 +23,7 @@ load_dotenv()
 user = os.getenv("user")
 password = os.getenv("password")
 
-jdbc_url = "jdbc:postgresql://localhost:5432/air"
+jdbc_url = "jdbc:postgresql://localhost:5432/Apps_Database"
 
 connection_properties = {
     "user": user,
@@ -23,7 +31,7 @@ connection_properties = {
     "driver": "org.postgresql.Driver"
 }
 
-uncleaned_data = spark.read.jdbc(url=jdbc_url, table="test_table_create_testing_final", properties=connection_properties)
+uncleaned_data = spark.read.jdbc(url=jdbc_url, table="apps_raw_data_table", properties=connection_properties)
 
 uncleaned_data = uncleaned_data.withColumn("Rating", f.when(f.col("Rating") == "NaN", "0.0").otherwise(f.col("Rating")))
 
@@ -56,18 +64,25 @@ cleaning_data_test = cleaning_data.withColumn(
 
 cleaning_data = cleaning_data_test.withColumn("Android Ver", f.regexp_replace(cleaning_data_test["Android Ver"], " and up", ""))
 
+cleaning_data = cleaning_data.withColumn("Price", f.regexp_replace(f.col("Price"), "\\$", "").cast("float"))
 
-# csv_path = "./Data/"
-# cleaning_data.write.csv(csv_path, header=True, mode = "overwrite")
+values_to_filter = ['0', '102248', 'NaN', '2509']
 
+# Filter the rows with the specified values
+filtered_rows = cleaning_data.filter(~cleaning_data['Type'].isin(values_to_filter))
 
+# Show the filtered rows
+# filtered_rows.show()
+df = filtered_rows.withColumn("Rating", f.col("Rating").cast("float"))
+df = df.withColumn("Reviews", f.col("Reviews").cast("integer"))
+df = df.withColumn("Size_in_Megabytes", f.col("Size_in_Megabytes").cast("float"))
 
-# # %%
-# parquet_path = "./Data/Parquet_Data/"
-# cleaning_data.write.parquet(parquet_path, mode="overwrite")
+try:
+    df.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'stagged_google_playstore_data', user='postgres',password='1234').mode('overwrite').save()
+    logger.info("Cleaned Data Successfully Loaded to Db")
 
-cleaning_data.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'stagged_google_playstore_data', user='postgres',password='1234').mode('overwrite').save()
-
+except Exception as e:
+    logger.error("Cleaned Data To DB failed.")
 
 
 
