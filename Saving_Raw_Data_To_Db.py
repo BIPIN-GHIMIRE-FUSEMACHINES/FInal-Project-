@@ -1,5 +1,14 @@
 from pyspark.sql import SparkSession
 import logging
+import yaml
+
+
+yaml_file_path = '/home/rojesh/Documents/FInal-Project-/configuration.yaml'
+
+# Read the YAML file and parse it into a Python dictionary
+with open(yaml_file_path, 'r') as yaml_file:
+    config = yaml.safe_load(yaml_file)
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -13,7 +22,7 @@ spark = SparkSession.builder.appName("CSVtoPostgres")\
                             .getOrCreate()
 
 try:
-    uncleaned_data = spark.read.csv("/home/bipin/FInal-Project-/Data/Raw_Data/googleplaystoree.csv", header=True, inferSchema=True)
+    uncleaned_data = spark.read.csv(config["Raw_Data_Path"], header=True, inferSchema=True)
     logger.info("************************")
     logger.info("CSV File successfully read.")
     logger.info("*************************")
@@ -22,13 +31,9 @@ except Exception as e:
     logger.error("Coundnot Find the CSV File: %s", str(e))
 # uncleaned_data.show()
 
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-
-user = os.getenv("user")
-password = os.getenv("password")
+user = config["pg_user"]
+password = config["pg_password"]
 
 jdbc_url = "jdbc:postgresql://localhost:5432/Apps_Database"
 

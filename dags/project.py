@@ -12,8 +12,17 @@ import requests
 import pandas as pd
 import os
 import logging
+import yaml
 
-logger = logging.getLogger(_name_)
+
+yaml_file_path = '/home/rojesh/Documents/FInal-Project-/configuration.yaml'
+
+# Read the YAML file and parse it into a Python dictionary
+with open(yaml_file_path, 'r') as yaml_file:
+    config = yaml.safe_load(yaml_file)
+
+
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch = logging.StreamHandler()
@@ -23,7 +32,7 @@ logger.addHandler(ch)
 
 def file_size_validation(**kwargs):
     try:
-        csv_file_path = '/home/bipin/FInal-Project-/Data/Raw_Data/googleplaystore.csv'
+        csv_file_path = config["Raw_Data_Path"]
 
         file_size_byte = os.path.getsize(csv_file_path)
 
@@ -59,7 +68,7 @@ with DAG(
      
     spark_submit = BashOperator(
         task_id='spark_submit_task',
-        bash_command="spark-submit /home/bipin/FInal-Project-/Saving_Raw_Data_To_Db.py",
+        bash_command="spark-submit /home/rojesh/Documents/FInal-Project-/Saving_Raw_Data_To_Db.py",
     )
     
     File_Size_Validation >> spark_submit
