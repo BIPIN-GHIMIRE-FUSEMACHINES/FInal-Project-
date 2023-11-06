@@ -4,26 +4,41 @@ import os
 from pyspark.sql import SparkSession
 import logging
 import yaml
+import datetime
+
+load_dotenv()
+
+log_folder = os.getenv("log_folder_path")
+current_datetime = datetime.datetime.now()
+log_filename = current_datetime.strftime("%Y-%m-%d.log")
+log_file_path = os.path.join(log_folder,log_filename)
 
 # #Initializing Logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch = logging.FileHandler("/home/bipin/FInal-Project-/test.log")
+ch = logging.FileHandler(log_file_path, mode = 'a')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
 # Create a Spark session
+logger.info("Creating Spark Session")
+
+jar_file_path = os.getenv("postgres_jar_file_path")
 spark = SparkSession.builder.appName("CleaningData")\
-    .config('spark.driver.extraClassPath','/usr/lib/jvm/java-17-openjdk-amd64/lib/postgresql-42.6.0.jar')\
+    .config('spark.driver.extraClassPath',jar_file_path)\
     .getOrCreate()
 
+logger.info("Spark Session Successfully Created")
 
-load_dotenv()
 
-user = os.getenv("user")
-password = os.getenv("password")
+logger.info("Loading the environment variables.")
+
+user = os.getenv("postgres_username")
+password = os.getenv("postgres_password")
+logger.info("Environment Variables successfully Loaded.")
+
 
 jdbc_url = "jdbc:postgresql://localhost:5432/Apps_Database"
 
@@ -33,8 +48,15 @@ connection_properties = {
     "driver": "org.postgresql.Driver"
 }
 
-#Reading the Database from Postgres
-uncleaned_data = spark.read.jdbc(url=jdbc_url, table="apps_raw_data_table", properties=connection_properties)
+logger.info("Reading the Data from postgres Database.")
+try:
+    #Reading the Database from Postgres
+    uncleaned_data = spark.read.jdbc(url=jdbc_url, table="apps_raw_data_table", properties=connection_properties)
+    logger.info("Connection to postgres for reading data successfull.")
+except Exception as e:
+    logger.error("Unable to connect to postgres for reading data.")
+    
+logger.info("Postgres Data Successfully Read")
 
 # Replacing NaN (null value) present in the Rating Column with 0.0
 uncleaned_data = uncleaned_data.withColumn("Rating", f.when(f.col("Rating") == "NaN", "0.0").otherwise(f.col("Rating")))
@@ -88,9 +110,11 @@ df = filtered_rows.withColumn("Rating", f.col("Rating").cast("float"))
 df = df.withColumn("Reviews", f.col("Reviews").cast("integer"))
 df = df.withColumn("Size_in_Megabytes", f.col("Size_in_Megabytes").cast("float"))
 
+
+logger.info("Loading the Cleaned Data to postgres database.")
 # Dumping the cleaned dataframe to postgres.
 try:
-    df.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'stagged_google_playstore_data_test', user=user, password=password).mode('overwrite').save()
+    df.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'Cleaned_google_playstore_data', user=user, password=password).mode('overwrite').save()
     logger.info("Cleaned Data Successfully Loaded to Db")
 
 except Exception as e:
