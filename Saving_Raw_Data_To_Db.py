@@ -32,21 +32,6 @@ spark = SparkSession.builder.appName("CSVtoPostgres")\
                             .config('spark.driver.extraClassPath',jar_file_path)\
                             .getOrCreate()
 
-custom_schema = StructType([
-    StructField("App", StringType(), True),
-    StructField("Category", StringType(), True),
-    StructField("Rating", FloatType(), True),
-    StructField("Reviews", IntegerType(), True),
-    StructField("Size", StringType(), True),
-    StructField("Installs", StringType(), True),
-    StructField("Type", StringType(), True),
-    StructField("Price", StringType(), True),
-    StructField("Content Rating", StringType(), True),
-    StructField("Genres", StringType(), True),
-    StructField("Last Updated", StringType(), True),
-    StructField("Current Ver", StringType(), True),
-    StructField("Android Ver", StringType(), True),
-])
 
 logger.info("Reading Raw Data")
 try:
@@ -57,11 +42,11 @@ except Exception as e:
     logger.error("Coundnot Find the CSV File: %s", str(e))
 # uncleaned_data.show()
 
-spark.conf.set("spark.sql.legacy.timeParserPolicy","LEGACY")
+# spark.conf.set("spark.sql.legacy.timeParserPolicy","LEGACY")
 
-# data = uncleaned_data.withColumn("Last Updated", regexp_replace(col("Last Updated"), "Jan", "January"))  # Replace abbreviated month names
-data = uncleaned_data.withColumn("Last Updated", f.regexp_replace(f.col("Last Updated"), ",", ""))  # Remove commas
-data = data.withColumn("Last Updated", f.to_date(f.col("Last Updated"), "MMMM d yyyy"))
+# # data = uncleaned_data.withColumn("Last Updated", regexp_replace(col("Last Updated"), "Jan", "January"))  # Replace abbreviated month names
+# data = uncleaned_data.withColumn("Last Updated", f.regexp_replace(f.col("Last Updated"), ",", ""))  # Remove commas
+# data = data.withColumn("Last Updated", f.to_date(f.col("Last Updated"), "MMMM d yyyy"))
 
 
 
@@ -72,7 +57,7 @@ jdbc_url = "jdbc:postgresql://localhost:5432/Apps_Database"
 
 logger.info("Dumping the raw data to postgres database using custome schema.")
 try:
-    data.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'apps_raw_data_table', user=user,password=password).mode('overwrite').save()
+    uncleaned_data.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'google_playstore_apps_raw_data_table', user=user,password=password).mode('overwrite').save()
     logger.info("Raw Data successfully loaded to DB")
 except Exception as e:
     logger.error("Couldnot load data to postgres: %s",str(e))
