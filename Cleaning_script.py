@@ -51,7 +51,7 @@ connection_properties = {
 logger.info("Reading the Data from postgres Database.")
 try:
     #Reading the Database from Postgres
-    uncleaned_data = spark.read.jdbc(url=jdbc_url, table="apps_raw_data_table", properties=connection_properties)
+    uncleaned_data = spark.read.jdbc(url=jdbc_url, table="google_playstore_apps_raw_data_table", properties=connection_properties)
     logger.info("Connection to postgres for reading data successfull.")
 except Exception as e:
     logger.error("Unable to connect to postgres for reading data.")
@@ -110,15 +110,26 @@ df = filtered_rows.withColumn("Rating", f.col("Rating").cast("float"))
 df = df.withColumn("Reviews", f.col("Reviews").cast("integer"))
 df = df.withColumn("Size_in_Megabytes", f.col("Size_in_Megabytes").cast("float"))
 
+#Removing + from Installs column and converting it to Integer type. 
+df = df.withColumn("Installs", f.regexp_replace(f.col("Installs"), "\\+", ""))
+df = df.withColumn("Installs", f.regexp_replace(f.col("Installs"), ",", ""))
+df = df.withColumn("Installs", f.col("Installs").cast("integer"))
+
+spark.conf.set("spark.sql.legacy.timeParserPolicy","LEGACY")
+
+# data = uncleaned_data.withColumn("Last Updated", regexp_replace(col("Last Updated"), "Jan", "January"))  # Replace abbreviated month names
+data = df.withColumn("Last Updated", f.regexp_replace(f.col("Last Updated"), ",", ""))  # Remove commas
+data = data.withColumn("Last Updated", f.to_date(f.col("Last Updated"), "MMMM d yyyy"))
 
 logger.info("Loading the Cleaned Data to postgres database.")
 # Dumping the cleaned dataframe to postgres.
 try:
-    df.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'Cleaned_google_playstore_data', user=user, password=password).mode('overwrite').save()
+    data.write.format('jdbc').options(url=jdbc_url,driver = 'org.postgresql.Driver', dbtable = 'Cleaned_google_playstore_data', user=user, password=password).mode('overwrite').save()
     logger.info("Cleaned Data Successfully Loaded to Db")
 
 except Exception as e:
     logger.error("Cleaned Data To DB failed.")
+    logger.error(e)
 
 
 
