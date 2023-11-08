@@ -19,6 +19,8 @@ logger.addHandler(ch)
 Data_Path = Variable.get("csv_file_path")
 extraction_script = Variable.get("extraction_script")
 transformation_script = Variable.get("Transformation_Script")
+Business_metrics = Variable.get("Business_metrics_script")
+
 
 def file_type_validation(**kwargs):
     try:
@@ -104,6 +106,10 @@ with DAG(
         task_id = 'Transform_And_Load',
         bash_command = "spark-submit {{ var.value.Transformation_Script }}"
     )
-
     
-    File_type_validation >>  File_Size_Validation >> column_header_validation >> Raw_Data_To_Db >> Transform_And_Load
+    Business_metrics = BashOperator(
+        task_id = 'Business_Metrics_Generation',
+        bash_command = "spark-submit {{var.value.Business_metrics_script}}"
+    )
+    
+    File_type_validation >>  File_Size_Validation >> column_header_validation >> Raw_Data_To_Db >> Transform_And_Load >> Business_metrics
